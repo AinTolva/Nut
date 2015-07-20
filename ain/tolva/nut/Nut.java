@@ -90,9 +90,20 @@ public class Nut implements Runnable {
 		// TODO
 
 		popup.add(addPlugin);
+		
+		addPlugins();
+		
 		popup.add(exitItem);
 		trayIcon.setPopupMenu(popup);
 		tray.add(trayIcon);
+	}
+
+	private void addPlugins() {
+		AddPlugin p = AddPlugin.newAP();
+		
+		while(p.peek()) {
+			popup.add(p.pop());
+		}
 	}
 
 	/**
