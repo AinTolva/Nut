@@ -1,6 +1,11 @@
 package ain.tolva.nut.backend;
 
 import java.awt.MenuItem;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.LinkedList;
 import java.util.Stack;
 import javax.xml.parsers.*;
@@ -20,11 +25,14 @@ import ain.tolva.nut.plugin.NutPlugin;
 public class AddPlugin{
 
 	private Stack<NutPlugin> tooAddPlugins;
+	private Stack<String> addedLocations;
 	private LinkedList<NutPlugin> plugins;
 	private boolean hasRun;
+	private Document dom;
 
 	private AddPlugin() {
 		tooAddPlugins = new Stack<NutPlugin>();
+		addedLocations = new Stack<String>();
 		plugins = new LinkedList<NutPlugin>();
 		hasRun = false;
 	}
@@ -42,34 +50,98 @@ public class AddPlugin{
 	}
 
 	public boolean empty() {
+		if(!hasRun) readInPlugins();
 		return tooAddPlugins.empty();
 	}
 
 	// TODO implement reading and writing plugin data
-
-	public boolean readInPlugins() {
+	// http://stackoverflow.com/questions/7373567/java-how-to-read-and-write-xml-files/7373596#7373596
+	public void readInPlugins() {
 		// Throws added plugins on the TooAddPlugins Stack
 		if(!hasRun) {// if this has run once there is nothing to do
-			Document dom;
-			DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+
 			try {
+				DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
 				DocumentBuilder db = dbf.newDocumentBuilder();
-				dom = db.parse("TODO");
+				dom = db.parse(new File("plist.xml"));
 
-				NodeList doc = dom.getElementsByTagName("plugin");
-
-				for(int i = 0; i < doc.getLength(); i++) {
-					// TODO: process plugin
+				if (dom != null) {
+					Element ele = dom.getDocumentElement();
+					if (ele != null) {
+						NodeList nl = ele.getElementsByTagName("location");
+						
+						for(int i = 0; i < nl.getLength(); i++) {
+							String loc = nl.item(i).getFirstChild().getNodeValue();
+							tooAddPlugins.push(addJar(loc));
+							addedLocations.push(loc);
+						}
+					}
 				}
-			} catch (Exception e) {
+
+			} catch (SAXException 
+					| IOException 
+					| ParserConfigurationException e) {
 				// Log
+			} finally {
+				hasRun = true;	
 			}
-				
-			if(!this.empty()) return true;
 		}
-		return false;
 	}
 	
+	private NutPlugin addJar(String loc) {
+		try {
+			File f = new File(loc);
+			ClassLoader cl = URLClassLoader.newInstance(new URL[] { f.toURL() }); // fix deprecation issue
+			NutPlugin plugin = (NutPlugin) cl.loadClass("plugins.authorized.Authorized").newInstance();
+			return plugin;
+		} catch (Exception e){
+			// log
+		}
+		
+		return null;
+	}
+
+	public void saveToXML(String xml) {
+	    Element e = null;
+
+	    // instance of a DocumentBuilderFactory
+	    DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+	    try {
+	        // use factory to get an instance of document builder
+	        DocumentBuilder db = dbf.newDocumentBuilder();
+	        // create instance of DOM
+	        dom = db.newDocument();
+
+	        // create the root element
+	        Element rootEle = dom.createElement("plugin");
+
+	        //create data elements and place them under root
+	        e = dom.createElement("location");
+	        e.appendChild(dom.createTextNode(addedLocations.pop()));
+	        rootEle.appendChild(e);
+
+	        dom.appendChild(rootEle);
+
+	        try {
+	            Transformer tr = TransformerFactory.newInstance().newTransformer();
+	            tr.setOutputProperty(OutputKeys.INDENT, "yes");
+	            tr.setOutputProperty(OutputKeys.METHOD, "xml");
+	            tr.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
+	            tr.setOutputProperty(OutputKeys.DOCTYPE_SYSTEM, "plug.dtd");
+	            tr.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "4");
+
+	            // send DOM to file
+	            tr.transform(new DOMSource(dom), 
+	                                 new StreamResult(new FileOutputStream(xml)));
+
+	        } catch (IOException | TransformerException ex) {
+	            // Log
+	        }
+	    } catch (ParserConfigurationException pce) {
+	        // Log
+	    }
+	}
+
 	private static class buildAddPlugin { // Thread safe way to create singleton
 		private static final AddPlugin INSTANCE = new AddPlugin();	
 	}
