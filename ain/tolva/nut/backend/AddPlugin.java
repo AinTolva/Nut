@@ -22,42 +22,33 @@ import ain.tolva.nut.plugin.NutPlugin;
  * This class handles writing and importing plugins. 
  * It uses a stack metaphor to describe the plugin storage.
  */
-public class AddPlugin{
+public class AddPlugin {
 
-	private Stack<NutPlugin> tooAddPlugins;
-	private Stack<String> addedLocations;
-	private LinkedList<NutPlugin> plugins;
-	private boolean hasRun;
+	private static final String THIS_CLASS = "AddPlugin.java";
+	
+	private Stack<NutPlugin> tooAddPlugins = new Stack<NutPlugin>();
+	private Stack<String> addedLocations = new Stack<String>();
+	private LinkedList<NutPlugin> plugins = new LinkedList<NutPlugin>();
+	private ErrorLog erlog = ErrorLog.getInstance();
+	
+	private boolean hasRun = false;
 	private Document dom;
 
 	private AddPlugin() {
-		tooAddPlugins = new Stack<NutPlugin>();
-		addedLocations = new Stack<String>();
-		plugins = new LinkedList<NutPlugin>();
-		hasRun = false;
-	}
-
-	public static AddPlugin newAP() {
-		return buildAddPlugin.INSTANCE;
+		readInPlugins();
 	}
 
 	public MenuItem pop() {
-		if(!hasRun) readInPlugins();
-		if(this.empty()) return null;
-
+		if(empty()) return null;
 		plugins.add(tooAddPlugins.peek());
 		return tooAddPlugins.pop().getMenuItem();
 	}
 
 	public boolean empty() {
-		if(!hasRun) readInPlugins();
 		return tooAddPlugins.empty();
 	}
 
-	// TODO implement reading and writing plugin data
-	// http://stackoverflow.com/questions/7373567/java-how-to-read-and-write-xml-files/7373596#7373596
 	public void readInPlugins() {
-		// Throws added plugins on the TooAddPlugins Stack
 		if(!hasRun) {// if this has run once there is nothing to do
 
 			try {
@@ -68,12 +59,17 @@ public class AddPlugin{
 				if (dom != null) {
 					Element ele = dom.getDocumentElement();
 					if (ele != null) {
-						NodeList nl = ele.getElementsByTagName("location");
+						NodeList nlCLA = ele.getElementsByTagName("pluginclass");
+						NodeList nlLOC = ele.getElementsByTagName("location");
 						
-						for(int i = 0; i < nl.getLength(); i++) {
-							String loc = nl.item(i).getFirstChild().getNodeValue();
-							tooAddPlugins.push(addJar(loc));
-							addedLocations.push(loc);
+						for(int i = 0; i < nlLOC.getLength() && i < nlCLA.getLength(); i++) {
+							String cl = nlCLA.item(i).getFirstChild().getNodeValue().trim(); // class
+							String loc = nlLOC.item(i).getFirstChild().getNodeValue().trim(); // location
+							NutPlugin n = addJar(loc, cl);
+							if (n != null) { // AddJar can return Null which can cause issues.
+								tooAddPlugins.push(n);
+								addedLocations.push(loc);
+							}
 						}
 					}
 				}
@@ -81,24 +77,26 @@ public class AddPlugin{
 			} catch (SAXException 
 					| IOException 
 					| ParserConfigurationException e) {
-				// Log
+				erlog.log(THIS_CLASS, e);
 			} finally {
-				hasRun = true;	
+				hasRun = true;
 			}
 		}
 	}
 	
-	private NutPlugin addJar(String loc) {
+	private NutPlugin addJar(String loc, String classLoc) {
+		NutPlugin n = null;
+		
 		try {
 			File f = new File(loc);
-			ClassLoader cl = URLClassLoader.newInstance(new URL[] { f.toURL() }); // fix deprecation issue
-			NutPlugin plugin = (NutPlugin) cl.loadClass("plugins.authorized.Authorized").newInstance();
-			return plugin;
-		} catch (Exception e){
-			// log
+			URL[] urls = new URL[] { f.toURI().toURL() };
+			ClassLoader cl = URLClassLoader.newInstance(urls); 
+			n = ((NutPlugin) cl.loadClass(classLoc).newInstance());
+		} catch (NoClassDefFoundError | Exception e){
+			erlog.log(THIS_CLASS, e);
 		}
 		
-		return null;
+		return n;
 	}
 
 	public void saveToXML(String xml) {
@@ -135,12 +133,14 @@ public class AddPlugin{
 	                                 new StreamResult(new FileOutputStream(xml)));
 
 	        } catch (IOException | TransformerException ex) {
-	            // Log
+	            erlog.log(THIS_CLASS, ex);
 	        }
 	    } catch (ParserConfigurationException pce) {
-	        // Log
+	        erlog.log(THIS_CLASS, pce);
 	    }
 	}
+	
+	public static AddPlugin getInstance() { return buildAddPlugin.INSTANCE; }
 
 	private static class buildAddPlugin { // Thread safe way to create singleton
 		private static final AddPlugin INSTANCE = new AddPlugin();	

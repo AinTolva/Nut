@@ -16,6 +16,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
+import java.util.Stack;
 
 import javax.swing.ImageIcon;
 
@@ -27,82 +28,93 @@ import ain.tolva.nut.plugin.*;
 @SuppressWarnings("unused")
 public class Nut implements Runnable {
 
-	// Mutable Variables
+	private static final String THIS_CLASS = "Nut.java";
+	
+	private PopupMenu popup = new PopupMenu();
+	private SystemTray tray = SystemTray.getSystemTray();
 	private Menu displayMenu = new Menu("Display");
-	private ErrorLog err;
+	private ErrorLog erlog;
 	private ArrayList<NutPlugin> plug;
 	private TrayIcon trayIcon;
-	// Final Global Variables
-	private final PopupMenu popup = new PopupMenu();
-	private final SystemTray tray = SystemTray.getSystemTray();
-
+	
 
 	/**
-	 * This Constructor manages exceptions for the program, and launches the program
-	 * @throws NoTrayAccessException
+	 * @throws NoTrayAccessException, FileNotFoundException
 	 */
-	public Nut(ErrorLog l) throws NoTrayAccessException {
-		err = l;
-
-		try {
-				trayIcon = new TrayIcon(createImage("media/alert.gif", "tray icon"));
-		} catch (FileNotFoundException e) {
-			// TODO
-			err.log(e);
-		}
-
+	public Nut() 
+			throws NoTrayAccessException, FileNotFoundException {
+		erlog = ErrorLog.getInstance();
+		
 		if(!SystemTray.isSupported()) { // The System Tray is not supported
 			throw new NoTrayAccessException("No System Support");
+		}
+		
+		trayIcon = new TrayIcon(createImage("media/alert.gif", "tray icon"));
+	}
+	
+	/**
+	 * Launches a new Thread to run the program.
+	 */
+	@Override
+	public void run() {
+		try {
+			launch();
+		} catch (AWTException | InterruptedException e) {
+			erlog.log(THIS_CLASS, e);
 		}
 	}
 
 	/**
-	 * This launches and builds the Application
 	 * @throws AWTException
 	 * @throws InterruptedException
 	 */
 	public void launch() throws AWTException, InterruptedException {
-		System.out.println("launch");
-
-		// Create a popup menu components
-		// Pull Menu items from plugins
-		MenuItem addPlugin = new MenuItem("Add Plugin");
-		MenuItem exitItem = new MenuItem("Exit");
-
-		// Define behavior
-
-		// Add Popup window to add plugins control settings.
-		addPlugin.addActionListener(new ActionListener() {
+		addPlugins(getPlugins());
+		popup.add(buildAddPluginItem());
+		popup.add(buildExitItem());
+		trayIcon.setPopupMenu(popup);
+		tray.add(trayIcon);
+	}
+	
+	private MenuItem buildAddPluginItem() {
+		MenuItem ap = new MenuItem("Add Plugin");
+		
+		ap.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				// TODO
 			}
 		});
+		
+		return ap;
+	}
+	
+	private MenuItem buildExitItem() {
+		MenuItem e = new MenuItem("Exit");
 
-		// Exit
-		exitItem.addActionListener(new ActionListener() {
+		e.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				tray.remove(trayIcon);
 				System.exit(0);
 			}
 		});
-
-		//Add components to popup menu
-		// TODO
-
-		popup.add(addPlugin);
 		
-		addPlugins();
-		
-		popup.add(exitItem);
-		trayIcon.setPopupMenu(popup);
-		tray.add(trayIcon);
+		return e;
 	}
 
-	private void addPlugins() {
-		AddPlugin p = AddPlugin.newAP();
-		
+	private Stack<MenuItem> getPlugins() {
+		AddPlugin p = AddPlugin.getInstance();
+		Stack<MenuItem> plug = new Stack<>();
 		while(!p.empty()) {
-			popup.add(p.pop());
+			MenuItem i = p.pop();
+			if(i != null) 
+				plug.push(i);
+		}
+		return plug;
+	}
+	
+	private void addPlugins(Stack<MenuItem> plug)  {
+		while(!plug.empty()) {
+			popup.add(plug.pop());
 		}
 	}
 
@@ -119,18 +131,5 @@ public class Nut implements Runnable {
 			throw new FileNotFoundException();
 
 		return (new ImageIcon(imageURL, description)).getImage();
-	}
-
-	/**
-	 * Launches a new Thread to run the program.
-	 */
-	@Override
-	public void run() {
-		// TODO Auto-generated method stub
-		try {
-			launch();
-		} catch (AWTException | InterruptedException e) {
-			err.log(e);
-		}
 	}
 }
