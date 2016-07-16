@@ -1,50 +1,33 @@
 package ain.tolva.nut.backend.alerts;
 
-import javax.swing.JFrame;
+import javax.swing.JOptionPane;
 
-public class Alerter extends JFrame implements Runnable {
-	
+public class Alerter implements Runnable {
+
 	private static final long serialVersionUID = 1L;
-	AlertType alert;
-	
-	public Alerter(AlertType a) {
+	private AlertType alert;
+	private String message;
+
+	public Alerter(AlertType a, String m) {
+		setAlert(a);
+		setMessage(m);
+	}
+
+	public void setAlert(AlertType a) {
 		alert = a;
 	}
-	
+
+	public void setMessage(String m) {
+		message = m;
+	}
+
 	private void createAlert() {
-		switch (alert) {
-			case ERROR:
-				createErrorAlert();
-				break;
-			case ISSUE:
-				createIssueAlert();
-				break;
-			case ATTENTION:
-				createAttentionAlert();
-				break;
-			default:
-				break;
-		}
-	}
-
-	private void createAttentionAlert() {
-		// TODO Auto-generated method stub
-		
-	}
-
-	private void createIssueAlert() {
-		// TODO Auto-generated method stub
-		
-	}
-
-	private void createErrorAlert() {
-		// TODO Auto-generated method stub
-		
+        JOptionPane.showMessageDialog(null, message, alert.toString(),
+                alert.getType(alert));
 	}
 
 	@Override
 	public void run() {
 		createAlert();
 	}
-	
 }

@@ -2,7 +2,7 @@
 <!DOCTYPE roles SYSTEM "plug.dtd">
 <plugin>
   <pluginclass>
-  	ain.tolva.nut.test.TestPlugin
+  	ain.tolva.nut.test.AlertTest
   </pluginclass>
   <location>
     ain/tolva/nut/test/TestPlugin.jar
